@@ -450,6 +450,8 @@
     margin-top: 18px;
   }
   .form-status.show{ display:flex; }
+  .form-status.is-error{ background: #ffe4d8; color: #7a2c10; }
+  .form-status.is-error svg{ stroke: #c4431a; }
   .form-status svg{ width:20px; height:20px; stroke: var(--orange); flex-shrink:0; }
 
   /* =====================================================
@@ -880,7 +882,26 @@
       </div>
 
       <div class="booking-form">
-        <form id="bookingForm" novalidate>
+        <!--
+          Форма отправляется через Web3Forms (https://web3forms.com) —
+          бесплатный сервис приёма форм для статических сайтов без бэкенда,
+          письма приходят на: anakornilowa@gmail.com
+
+          Единственное, что осталось сделать вручную (за вас это сделать
+          нельзя — ключ высылается только на почту владельца):
+          1. Откройте https://web3forms.com/ → «Create Your Form».
+          2. Введите anakornilowa@gmail.com и подтвердите его по ссылке
+             из письма Web3Forms (придёт сразу).
+          3. Скопируйте присланный Access Key.
+          4. Замените YOUR_ACCESS_KEY ниже на этот ключ — и форма заработает.
+        -->
+        <form id="bookingForm" action="https://api.web3forms.com/submit" method="POST" novalidate>
+          <input type="hidden" name="access_key" value="YOUR_ACCESS_KEY">
+          <input type="hidden" name="subject" value="Новая заявка на груминг — сайт «Мягкая Лапа»">
+          <input type="hidden" name="from_name" value="Сайт «Мягкая Лапа»">
+          <!-- поле-ловушка для спам-ботов: должно остаться пустым и скрытым -->
+          <input type="checkbox" name="botcheck" style="display:none" tabindex="-1" autocomplete="off">
+
           <div class="form-row" id="row-name">
             <label for="clientName">Ваше имя</label>
             <input type="text" id="clientName" name="clientName" autocomplete="name" placeholder="Например, Анна">
@@ -922,7 +943,7 @@
 
           <div class="form-status" id="formStatus" role="status" aria-live="polite">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>
-            <span>Заявка отправлена! Мы свяжемся с вами в ближайшее время.</span>
+            <span id="formStatusText">Заявка отправлена! Мы свяжемся с вами в ближайшее время.</span>
           </div>
         </form>
       </div>
@@ -1038,6 +1059,7 @@
   ===================================================== */
   const form = document.getElementById('bookingForm');
   const formStatus = document.getElementById('formStatus');
+  const formStatusText = document.getElementById('formStatusText');
 
   const fields = {
     name: {
@@ -1068,7 +1090,7 @@
 
   form.addEventListener('submit', function (e) {
     e.preventDefault();
-    formStatus.classList.remove('show');
+    formStatus.classList.remove('show', 'is-error');
 
     let isValid = true;
     let firstInvalidInput = null;
@@ -1091,12 +1113,32 @@
     submitBtn.disabled = true;
     submitBtn.textContent = 'Отправляем…';
 
-    setTimeout(() => {
-      formStatus.classList.add('show');
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Отправить заявку';
-      form.reset();
-    }, 700);
+    // Реальная отправка данных формы на Web3Forms (см. комментарий у <form> выше —
+    // нужно один раз подставить свой YOUR_ACCESS_KEY).
+    fetch(form.action, {
+      method: 'POST',
+      body: new FormData(form),
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          formStatusText.textContent = 'Заявка отправлена! Мы свяжемся с вами в ближайшее время.';
+          formStatus.classList.remove('is-error');
+          formStatus.classList.add('show');
+          form.reset();
+        } else {
+          throw new Error(data.message || 'Web3Forms вернул ошибку');
+        }
+      })
+      .catch(() => {
+        formStatusText.textContent = 'Не удалось отправить заявку. Позвоните нам напрямую по телефону выше.';
+        formStatus.classList.add('show', 'is-error');
+      })
+      .finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Отправить заявку';
+      });
   });
 </script>
 
